@@ -11,6 +11,6 @@ use magic_number::check_magic_number;
 
 fn main() {
     let ref mut reader = ...;
-        check_magic_number(reader, vec![b'T', b'E', b'S', b'T']).unwrap();
+    check_magic_number(reader, vec![b'T', b'E', b'S', b'T']).unwrap();
 }
 ```
