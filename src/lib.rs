@@ -9,6 +9,21 @@ pub enum PossibleErrors {
     MagicNumber(WrongMagicNumber)
 }
 
+impl Error for PossibleErrors {
+    fn description(&self) -> &str {
+        "An Error that occurs when trying to check for a Magic Number"
+    }
+}
+
+impl fmt::Display for PossibleErrors {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PossibleErrors::IoError(e) => write!(f, "IO Error: {:?}", e),
+            PossibleErrors::MagicNumber(e) => write!(f, "Magic Number: {:?}", e)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct WrongMagicNumber {
     expected: Vec<u8>,
