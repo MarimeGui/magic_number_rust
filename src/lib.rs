@@ -4,23 +4,38 @@ use std::io::Read;
 use std::io;
 
 #[derive(Debug)]
-pub enum PossibleErrors {
+pub enum MagicNumberCheckError {
     IoError(io::Error),
     MagicNumber(WrongMagicNumber)
 }
 
-impl Error for PossibleErrors {
+impl Error for MagicNumberCheckError {
     fn description(&self) -> &str {
-        "An Error that occurs when trying to check for a Magic Number"
+        match *self {
+            MagicNumberCheckError::IoError(ref e) => e.description(),
+            MagicNumberCheckError::MagicNumber(ref e) => e.description()
+        }
     }
 }
 
-impl fmt::Display for PossibleErrors {
+impl fmt::Display for MagicNumberCheckError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            PossibleErrors::IoError(e) => write!(f, "IO Error: {:?}", e),
-            PossibleErrors::MagicNumber(e) => write!(f, "Magic Number: {:?}", e)
+            MagicNumberCheckError::IoError(ref e) => e.fmt(f),
+            MagicNumberCheckError::MagicNumber(ref e) => e.fmt(f)
         }
+    }
+}
+
+impl From<io::Error> for MagicNumberCheckError {
+    fn from(e: io::Error) -> MagicNumberCheckError {
+        MagicNumberCheckError::IoError(e)
+    }
+}
+
+impl From<WrongMagicNumber> for MagicNumberCheckError {
+    fn from(e: WrongMagicNumber) -> MagicNumberCheckError {
+        MagicNumberCheckError::MagicNumber(e)
     }
 }
 
@@ -38,28 +53,8 @@ impl Error for WrongMagicNumber {
 
 impl fmt::Display for WrongMagicNumber {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut expected_string_hex = String::new();
-        let mut count = 0;
-        for byte in self.expected.clone() {
-            if count < self.expected.len() {
-                expected_string_hex.push_str(&format!("{:X},", byte))
-            } else {
-                expected_string_hex.push_str(&format!("{:X}", byte))
-            };
-            count += 1;
-        }
-        let expected_string = String::from_utf8(self.expected.clone()).unwrap_or(expected_string_hex);
-        let mut read_string_hex = String::new();
-        let mut count = 0;
-        for byte in self.read.clone() {
-            if count < self.read.len() {
-                read_string_hex.push_str(&format!("{:X},", byte))
-            } else {
-                read_string_hex.push_str(&format!("{:X},", byte))
-            };
-            count += 1;
-        }
-        let read_string = String::from_utf8(self.read.clone()).unwrap_or(read_string_hex);
+        let expected_string = String::from_utf8(self.expected.clone()).unwrap_or(format!("{:X?}", self.expected));
+        let read_string = String::from_utf8(self.read.clone()).unwrap_or(format!("{:X?}", self.read));
         write!(
             f,
             "Incorrect Magic Number: Expected '{}', Read '{}'",
@@ -71,14 +66,11 @@ impl fmt::Display for WrongMagicNumber {
 pub fn check_magic_number<R: Read>(
     reader: &mut R,
     magic_number: Vec<u8>,
-) -> Result<(), PossibleErrors> {
+) -> Result<(), MagicNumberCheckError>{
     let mut read = magic_number.clone();
-    match reader.read_exact(&mut read) {
-        Ok(_) => {},
-        Err(e) => return Err(PossibleErrors::IoError(e))
-    }
+    reader.read_exact(&mut read)?;
     if read != magic_number {
-        Err(PossibleErrors::MagicNumber(WrongMagicNumber { expected: magic_number, read }))
+        Err(MagicNumberCheckError::MagicNumber(WrongMagicNumber { expected: magic_number, read }))
     } else {
         Ok(())
     }
@@ -88,7 +80,7 @@ pub fn check_magic_number<R: Read>(
 mod test {
     use std::io::Cursor;
     use check_magic_number;
-    use PossibleErrors;
+    use MagicNumberCheckError;
     #[test]
     fn check_valid() {
         let ref mut reader = Cursor::new(vec![b'T', b'E', b'S', b'T']);
@@ -100,7 +92,7 @@ mod test {
         let ref mut reader = Cursor::new(vec![b'T', b'E', b'S', b'T']);
         match check_magic_number(reader, vec![b'N', b'E', b'S', b'T']) {
             Ok(_) => panic!("Expected an error"),
-            Err(PossibleErrors::MagicNumber(_)) => {},
+            Err(MagicNumberCheckError::MagicNumber(_)) => {},
             Err(_) => panic!("Unexpected error")
         }
     }
